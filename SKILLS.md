@@ -20,50 +20,95 @@ This file is the agent briefing for the whole repository. Read it first. Keep it
 ## Current status (update this section)
 
 - [x] Assignment PDF read; project 20 confirmed.
-- [x] Public academic papers / RFCs / advisories collected under `others/` (gitignored).
-- [ ] Attack variant chosen (WEP key recovery vs WPA/WPA2-PSK offline dictionary vs other).
-- [ ] Isolated lab topology defined (own AP + own clients only).
-- [ ] Design report (week 11): definition, topology, timing diagrams, frame details, justification.
-- [ ] Own tool implemented (no internet attack tools).
-- [ ] Countermeasure designed (bonus).
-- [ ] Final report + demo (weeks 13–14).
+- [x] Literature under `others/` (gitignored).
+- [x] Supervisor feedback received (see **Locked plan** below).
+- [ ] Plan confirmed with student (then rewrite proposal PDF).
+- [ ] Collect suitable public sample pcaps.
+- [ ] Implement own tool.
+- [ ] Defense bonus.
+- [ ] Final report + demo.
 
-**Repo layout today:** assignment PDF, this briefing, README, `.gitignore`. No implementation yet. `others/` exists only on machines that have fetched the literature cache.
+**Repo layout today:** assignment PDF, briefing, README, `.gitignore`, draft `docs/design-proposal.*` (will rewrite after plan is confirmed). No implementation yet.
 
-## Hard course rules
+## Locked plan (supervisor-aligned; confirm before coding)
 
-Quoted in substance from the assignment:
+### What the supervisor decided
 
-1. **You MUST program your OWN attack tool.**
-2. **You MUST NOT use any tool available on the Internet** (no aircrack-ng, hashcat, hcxdumptool, aireplay-ng, cowpatty, reaver, etc., and do not wrap or copy their source).
-3. Code is **mostly C / C++ / Python**.
-4. **Craft your own frame / packet / segment** in your own code.
-5. The report must say **which group member did which part**.
-6. Bonus: design **and implement** a defense for this attack.
+1. **Multiple attacks on one setup** (not one attack on many setups).
+2. **Attacks run on captured pcaps** (not primarily live RF demos).
+3. **Public sample pcaps from the Internet are allowed** as input.
 
-Allowed building blocks (environment, not a ready-made attack): OS sockets / raw 802.11 IO, Python stdlib (`hashlib`, `hmac`, `socket`, `struct`), and similar crypto primitives. Using a packet-crafting *library* as the whole attack is against the spirit of “craft your own frame.” Parse and build MAC/EAPOL fields yourself.
+Still required by the course PDF: **own cracker code**; do **not** use aircrack-ng / Hashcat / etc. to perform the crack.
+
+### What “one setup” means
+
+One toolchain on one machine:
+
+`pcap → own parser → shared crypto (PBKDF2 / HMAC) → attack modules → passphrase or fail`
+
+Same UI/CLI, same pcap folder, same wordlist/mask inputs. Only the **attack module** changes.
+
+### What counts as distinct “attacks”
+
+Need methods that are **clearly different** in the report (different verifier and/or different candidate strategy), not three names for the same loop.
+
+| # | Attack | What differs | Difficulty | Papers |
+| --- | --- | --- | --- | --- |
+| **A** | WPA2-PSK **4-way handshake MIC** + dictionary | Verifier = MIC after PTK derivation | Medium (baseline) | He & Mitchell 2004/2005; RFC 2898 |
+| **B** | WPA2-PSK **PMKID** + dictionary | Verifier = PMKID (no full PTK needed) | Easier than A | CERT-EU SA2018-019 |
+| **C** | WPA2-PSK **mask / limited brute** | Same verifiers as A/B; candidates from a pattern, not a wordlist | Easy add-on | Same + password-attack practice (Chalyi 2025 related) |
+
+**Recommended set: A + B + C.**  
+Why: all are real password cracking; all work offline on pcaps; one crypto core; easy to demo; fits “multiple attacks / one setup.”
+
+### What we are *not* planning (for now)
+
+| Idea | Why not (yet) |
+| --- | --- |
+| KRACK / TKIP chopchop | Not password cracking |
+| Dragonblood side channels | Too hard; not pcap-dictionary style |
+| WPA3 offline dictionary on SAE | By design should fail; use as **defense contrast**, not as attack #3 |
+| Full WEP PTW/FMS | Much harder; different stack; only add if supervisor wants protocol diversity |
+| Live deauth / evil twin as graded core | Supervisor asked for **pcap-based** attacks |
+
+### Pcaps
+
+- Use **published sample/demo** WPA2 captures (handshake and, if possible, PMKID). Prefer ones with a **documented test passphrase**.
+- Optional: record our own lab pcap later for the report screenshots.
+- Store pcaps under something like `datasets/` (gitignored if large/sensitive).
+- Do not use captures from networks you do not own/have no right to analyze.
+
+### Defense (bonus; not one of the three attacks)
+
+- Strong passphrase policy.
+- Prefer **WPA3-SAE-only** (no WPA2 transition).
+- Cite Dragonfly/SAE (RFC 7664; Lancrenon & Škrobot 2015) as why offline dict fails.
+- Cite Dragonblood (2020) as “misconfig / old SAE still risky.”
+
+### Demo script (success criteria)
+
+1. Run Attack A on handshake pcap → recover known test password.  
+2. Run Attack B on PMKID pcap (or same pcap if it has PMKID) → recover password.  
+3. Run Attack C with a short mask matching the test password → recover password.  
+4. Show a wrong wordlist/mask → fail cleanly.  
+5. Defense slide: WPA3-SAE blocks this class of offline attack.
+
+### Open choice (confirm)
+
+- **Default:** A + B + C (all WPA2-PSK, simplest).  
+- **Alternative:** replace C with a **simple WEP key-recovery** demo on a public WEP pcap if the supervisor wants an older protocol too (more code, more papers, higher risk).
+
+**Do not regenerate the proposal PDF until this plan is confirmed.**
 
 ## Ethics and scope
 
-This is a **controlled course lab**. Work only against an access point and clients **owned by the group**, on an isolated network, with explicit permission.
-
-Never target campus Wi-Fi, neighbors, public APs, or any network you do not own. Do not publish working attack binaries or captures that contain real credentials.
+Course lab / published sample pcaps only. Never target campus, neighbor, or other unauthorized networks. Do not redistribute captures that contain real third-party credentials.
 
 ## What “Wi-Fi password cracking” means here
 
-The assignment title is password *cracking*, not “any Wi-Fi attack.” Prefer a design whose **success criterion is recovering the lab passphrase / WEP key**.
+Success = **recovering a WPA2 passphrase** (or WEP key if that alternative is chosen) from pcap material using **our** code.
 
-Pedagogically standard, own-code-friendly variants (choose one and justify in the design report):
-
-| Variant | Recovered secret | Why it fits “password cracking” | Course-fit notes |
-| --- | --- | --- | --- |
-| **WPA/WPA2-PSK offline dictionary** | ASCII passphrase | Classic PSK crack: derive PMK, check against handshake material | Best match for the title. Needs EAPOL parse + PBKDF2/HMAC implemented by you. |
-| **WEP statistical key recovery** | WEP root key | Recovers the shared secret from IVs + keystream | Strong crypto-lab story (FMS / Klein / PTW). More statistics than “password.” |
-| **WPA3 SAE (Dragonblood-class)** | Passphrase via side channels | Password recovery against SAE | Hard for a 2-week demo; cite as related / defense motivation, not default target. |
-
-KRACK (nonce reuse) and TKIP chopchop **are not password cracking**. Cite them as related WPA(2) results, do not make them the graded attack unless the instructor agrees.
-
-**Recommended default for this course:** WPA2-Personal (PSK) offline dictionary against a **lab AP with a deliberately weak passphrase**, using a 4-way handshake (or PMKID) that **your code** extracts from frames **your code** parsed. Keep the wordlist tiny and local so the demo finishes live.
+KRACK and TKIP chopchop are related Wi-Fi results, not this project’s graded attacks. Dragonblood is defense/context, not the main demo.
 
 ## High-level protocol facts (for reports; not an attack cookbook)
 
