@@ -22,13 +22,56 @@ This file is the agent briefing for the whole repository. Read it first. Keep it
 - [x] Assignment PDF read; project 20 confirmed.
 - [x] Literature under `others/` (gitignored).
 - [x] Supervisor feedback received (see **Locked plan** below).
-- [ ] Plan confirmed with student (then rewrite proposal PDF).
-- [ ] Collect suitable public sample pcaps.
-- [ ] Implement own tool.
-- [ ] Defense bonus.
-- [ ] Final report + demo.
+- [x] Plan confirmed; A+B+C (WPA2-PSK MIC / PMKID / mask) on pcaps.
+- [x] Public sample pcap collected (`wpa-Induction.pcap`) as external oracle.
+- [x] **Own tool implemented** (`wpacrack/`, stdlib-only) — all 3 attacks + defense working.
+- [x] Defense module built (`defend/`: analyze + policy + estimate).
+- [ ] Final report + demo write-up (reuse proposal diagrams; add measured numbers).
 
-**Repo layout today:** assignment PDF, briefing, README, `.gitignore`, draft `docs/design-proposal.*` (will rewrite after plan is confirmed). No implementation yet.
+**Repo layout today:** assignment PDF, briefing, README, `.gitignore`, `docs/design-proposal.*`,
+and the working `wpacrack/` package + `tests/` + `fixtures/` + `wl/`, `masks/`, `tools/`.
+
+## Implementation (built and verified)
+
+Executed `IMPLEMENTATION_PLAN.md`. Everything is **file-in / verdict-out, standard library only**.
+
+**Package `wpacrack/`:**
+- `crypto/` — PMK (PBKDF2-HMAC-SHA1, SSID as salt), PRF-512, PTK (byte-wise min/max),
+  MIC v1/v2 (KDV dispatch; v3 raises `UnsupportedKDV`, out of scope), PMKID.
+- `pcap/` — classic pcap (both endiannesses, µs/ns) + pcapng reader.
+- `parse/` — radiotap/prism/none radio strip, 802.11 deframe (QoS-aware), EAPOL-Key
+  field extraction (frame truncated to declared length → trailing FCS ignored), RSN IE
+  AKM parse, beacon/probe SSID harvest → `HandshakeRecord`.
+- `attack_mic/`, `attack_pmkid/`, `attack_mask/` — the three attacks, one shared crypto core.
+- `defend/` — `analyze.py` (RSN AKM: WARN-PSK / WARN-TRANSITION / OK-SAE), `policy.py`,
+  `estimate.py` (keyspace/time at measured rate).
+- `sim/` — synthetic handshake+pcap generator with round-trip assertions.
+- `cli.py` — `mic | pmkid | mask | analyze | policy | estimate | report`.
+
+**Run it:**
+```
+python3 -m wpacrack.sim                       # (re)generate fixtures
+python3 -m wpacrack report --fixtures fixtures  # 3 attacks + defense, self-testing
+python3 -m pytest -q                          # 16 tests (use .venv; PEP 668 blocks system pip)
+python3 tools/ethics_guard.py                 # CI guard: no socket/injection anywhere
+```
+
+**Verification evidence:**
+- PMK matches canonical IEEE vector `f42c6f…a12e`.
+- Full PTK→MIC path cross-checked against **real** `wpa-Induction.pcap` (SSID `Coherer`,
+  passphrase `Induction`): correct pass verifies, wrong passphrases fail.
+- `report` self-test: MIC hit FOUND, PMKID hit FOUND, mask (6-digit `001234`) FOUND,
+  negative control EXHAUSTED (no false positive), WPA3-SAE → OK-SAE (no offline target).
+- Measured rate on this machine: ~255 PMK/s single-threaded (drives the mask time-box
+  and the strength estimator; the demo PIN is chosen small so mask finishes in seconds).
+
+**Notes / deviations from the plan:**
+- `wpa-Induction.pcap` is actually **KDV2 (HMAC-SHA1)**, not KDV1 as the plan guessed;
+  this is better since WPA2 uses KDV2. Its PMKID KDE is not PSK-derived, so PMKID is
+  validated via the synthetic generator instead.
+- KDV3 (AES-CMAC) left out of scope per the plan's recommendation.
+- Public captures are **gitignored** (`fixtures/public/`); synthetic fixtures are committed.
+
 
 ## Locked plan (supervisor-aligned; confirm before coding)
 
