@@ -72,6 +72,28 @@ python3 tools/ethics_guard.py                 # CI guard: no socket/injection an
 - KDV3 (AES-CMAC) left out of scope per the plan's recommendation.
 - Public captures are **gitignored** (`fixtures/public/`); synthetic fixtures are committed.
 
+## Demonstration report (`report/`)
+
+Built a supervisor-facing demo report with data + visuals generated from the tool itself.
+
+- `report/make_data.py` — runs the attacks, benchmarks PBKDF2 (hashlib vs naive pure-Python),
+  and emits `data.tex` (measured-number macros), `results_table.tex`, `estimate_table.tex`,
+  and two matplotlib figures (`figures/throughput.pdf`, `figures/timecrack.pdf`).
+- `report/demo-report.tex` → `report/demo-report.pdf` (5 pages): architecture diagram,
+  4-way-handshake sequence diagram (both TikZ), live-demo script, results table, performance
+  chart, defense analyzer + crack-time chart/table, correctness/ethics section.
+
+**Rebuild:**
+```
+. .venv/bin/activate && pip install matplotlib   # one-time (dev venv)
+python report/make_data.py                        # regenerate data + figures
+cd report && pdflatex demo-report.tex && pdflatex demo-report.tex
+```
+matplotlib is a **dev-only** dependency for the report charts; the tool itself stays stdlib-only.
+Measured rate is machine-dependent (~150-260 cand/s here) and flows into both the perf chart
+and the defense estimator.
+
+
 
 ## Locked plan (supervisor-aligned; confirm before coding)
 

@@ -2,12 +2,20 @@
 others/
 .cursor/
 *.zip
+test-results/   
 
 # Python
 .venv/
 __pycache__/
 *.pyc
 .pytest_cache/
+
+# LaTeX build artifacts (keep the .pdf and .tex)
+*.aux
+*.log
+*.out
+*.toc
+report/build.log
 
 # Downloaded public sample captures (re-fetch with tools/fetch_samples.sh).
 # Synthetic fixtures (fixtures/*.pcap) ARE committed; only the public/ cache is ignored.
