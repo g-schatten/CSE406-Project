@@ -26,7 +26,13 @@ This file is the agent briefing for the whole repository. Read it first. Keep it
 - [x] Public sample pcap collected (`wpa-Induction.pcap`) as external oracle.
 - [x] **Own tool implemented** (`wpacrack/`, stdlib-only) — all 3 attacks + defense working.
 - [x] Defense module built (`defend/`: analyze + policy + estimate).
-- [ ] Final report + demo write-up (reuse proposal diagrams; add measured numbers).
+- [x] Scope reconfirmed directly by supervisor: pcaps from the internet are sufficient input;
+      no live RF demo or own-lab capture required (see **Locked plan**).
+- [x] Demo report drafted (`report/demo-report.tex`) with measured CPU numbers + a GPU
+      acceleration appendix (estimate vs. measured experiment, CPU/GPU crossover, real
+      full-wordlist result) — see **Demonstration report** below.
+- [ ] `demo-report.pdf` recompiled with the GPU section and reviewed (needs a `pdflatex` pass;
+      not run yet on this machine — see **Demonstration report** rebuild steps).
 
 **Repo layout today:** assignment PDF, briefing, README, `.gitignore`, `docs/design-proposal.*`,
 and the working `wpacrack/` package + `tests/` + `fixtures/` + `wl/`, `masks/`, `tools/`.
@@ -79,19 +85,33 @@ Built a supervisor-facing demo report with data + visuals generated from the too
 - `report/make_data.py` — runs the attacks, benchmarks PBKDF2 (hashlib vs naive pure-Python),
   and emits `data.tex` (measured-number macros), `results_table.tex`, `estimate_table.tex`,
   and two matplotlib figures (`figures/throughput.pdf`, `figures/timecrack.pdf`).
-- `report/demo-report.tex` → `report/demo-report.pdf` (5 pages): architecture diagram,
+- `report/make_gpu_data.py` — **GPU appendix** (fills the "estimate vs measured experiment"
+  gap the design report had). Does NOT re-run anything (no GPU on this machine); it records
+  the real, validated measurements from `notebooks/gpu_pbkdf2_benchmark.ipynb` and
+  `notebooks/gpu_real_capture_crack.ipynb` (both run on Kaggle, 2x Tesla T4, kernel
+  byte-validated against `hashlib.pbkdf2_hmac` before any timing was trusted) plus this
+  repo's own machine's independent full-wordlist CPU cross-check, and emits `gpu_data.tex`,
+  `gpu_comparison_table.tex`, `gpu_fullscale_table.tex`, `figures/gpu_throughput.pdf`,
+  `figures/gpu_crossover.pdf`. To update with a fresh Kaggle run, edit the hardcoded
+  `RATE_*`/`T_*` constants at the top of the script (each has its source in a comment), then
+  re-run it.
+- `report/demo-report.tex` → `report/demo-report.pdf` (7 pages): architecture diagram,
   4-way-handshake sequence diagram (both TikZ), live-demo script, results table, performance
-  chart, defense analyzer + crack-time chart/table, correctness/ethics section.
+  chart, **GPU acceleration section (throughput chart, estimate-vs-CPU-vs-GPU comparison
+  table, CPU/GPU crossover chart, full-realistic-wordlist result)**, defense analyzer +
+  crack-time chart/table, correctness/ethics section.
 
 **Rebuild:**
 ```
 . .venv/bin/activate && pip install matplotlib   # one-time (dev venv)
-python report/make_data.py                        # regenerate data + figures
+python report/make_data.py                        # regenerate CPU-only data + figures
+python report/make_gpu_data.py                    # regenerate GPU-appendix data + figures
 cd report && pdflatex demo-report.tex && pdflatex demo-report.tex
 ```
 matplotlib is a **dev-only** dependency for the report charts; the tool itself stays stdlib-only.
 Measured rate is machine-dependent (~150-260 cand/s here) and flows into both the perf chart
-and the defense estimator.
+and the defense estimator. GPU numbers are Kaggle-only (no local GPU) — see `notebooks/` to
+reproduce or update them.
 
 
 
@@ -158,12 +178,13 @@ Why: all are real password cracking; all work offline on pcaps; one crypto core;
 4. Show a wrong wordlist/mask → fail cleanly.  
 5. Defense slide: WPA3-SAE blocks this class of offline attack.
 
-### Open choice (confirm)
+### Open choice — resolved
 
-- **Default:** A + B + C (all WPA2-PSK, simplest).  
-- **Alternative:** replace C with a **simple WEP key-recovery** demo on a public WEP pcap if the supervisor wants an older protocol too (more code, more papers, higher risk).
-
-**Do not regenerate the proposal PDF until this plan is confirmed.**
+**Confirmed: A + B + C (all WPA2-PSK)**, all running on pcaps found on the internet or synthetically
+generated, per direct supervisor instruction ("multiple attacks on one setup ... perform attacks
+on captured pcap packets ... you can find such from the internet"). No live RF demo and no
+own-lab capture are required — internet-sourced pcaps satisfy the requirement on their own.
+The WEP alternative was not requested and is not planned.
 
 ## Ethics and scope
 

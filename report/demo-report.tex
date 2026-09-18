@@ -25,6 +25,7 @@
 
 % measured numbers + generated tables
 \input{data.tex}
+\input{gpu_data.tex}
 
 % simple CLI-output box
 \newenvironment{cli}
@@ -229,6 +230,83 @@ a hand-rolled loop is our one big performance lever.
 \noindent This measured rate (\ratehashlib{}~cand/s) is exactly what drives the crack-time
 estimates in the defense section --- the attack cost model and the defense advice use the
 same number.
+
+%======================================================================
+\section{GPU acceleration: estimate vs.\ measured experiment}
+\label{sec:gpu}
+
+The design proposal's crack-time estimate used a single \emph{assumed} rate that was never
+actually measured. We closed that gap by building our own GPU-accelerated
+PBKDF2-HMAC-SHA1 kernel (PyTorch, RFC~2898 / IEEE~802.11i --- \textbf{not} aircrack-ng or
+Hashcat) and running it, alongside the same CPU code from Section~5, on a real machine: a
+Kaggle notebook with 2$\times$ Tesla~T4 GPUs. The kernel is validated byte-for-byte against
+\texttt{hashlib.pbkdf2\_hmac} before any timing is trusted (see
+\texttt{notebooks/gpu\_pbkdf2\_benchmark.ipynb}, Step~1); every number below is a real
+measurement, not a projection.
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.62\textwidth]{figures/gpu_throughput.pdf}
+\caption{Measured PBKDF2 throughput: \ratecpuone{}~cand/s (CPU, 1 core) up to
+\rategpudual{}~cand/s (dual T4), a \gpuspeedup$\times$ speedup, on the same Kaggle host.}
+\end{figure}
+
+\begin{table}[h]
+\centering\small
+\input{gpu_comparison_table.tex}
+\caption{Expected crack time for the same targets as Table~\ref{tab:est}, computed with
+\texttt{defend/estimate} at five different rates: the report's original never-measured
+assumption, two real CPU measurements, and two real GPU measurements. The rate alone moves
+some targets from ``years'' to ``minutes.''}
+\label{tab:gpu-compare}
+\end{table}
+
+\subsection{The crossover point: GPU does not always win}
+
+Because our from-scratch kernel dispatches many small GPU operations per candidate, its
+per-call overhead does not vanish at small batch sizes --- so plain CPU can, in fact, be
+faster than this GPU kernel below a break-even candidate count, and only wins decisively
+above it. We measured this directly on a real capture (\texttt{wpa2.eapol.cap}) rather than
+assuming it (see \texttt{notebooks/gpu\_real\_capture\_crack.ipynb}):
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.66\textwidth]{figures/gpu_crossover.pdf}
+\caption{CPU time grows linearly with the wordlist size $N$; GPU time does not scale the
+same way. The two real, measured curves cross at approximately \crossovern{} candidates ---
+below that, plain CPU wins; above it, GPU wins by an increasingly large margin.}
+\label{fig:gpu-crossover}
+\end{figure}
+
+\subsection{Full-scale result: a realistic wordlist}
+
+The clearest evidence is a genuine, realistic-scale attack: SecLists' full
+\nfull{}-entry common-password list against \texttt{wpa2.eapol.cap}, run to a complete,
+honest exhaustion (the true password was excluded from the scan first, so neither run could
+stop early --- see \texttt{exclude\_target()} in the notebook).
+
+\begin{table}[h]
+\centering\small
+\input{gpu_fullscale_table.tex}
+\caption{Full-realistic-wordlist result. The CPU row is \emph{calculated}
+($N/\text{measured rate}$), not re-run --- a genuine single-core full scan would cost
+$\sim$\tcpufull{} hours of compute to confirm a number a constant-per-candidate-cost
+algorithm already guarantees. The two cross-check rows are an independent, second machine's
+\emph{real, executed} full scans of the same wordlist against two different real captures
+and two different attacks (MIC and PMKID), confirming the CPU rate is not a one-machine
+fluke.}
+\label{tab:gpu-fullscale}
+\end{table}
+
+\noindent On this realistic, full-scale wordlist, the GPU kernel completes a real crack
+attempt in \tgpufull{} minutes; the equivalent single-core CPU run is calculated at
+\tcpufull{} hours --- a $\sim$\fullscalespeedup$\times$ difference. Below the
+\crossovern{}-candidate crossover, however, plain CPU is the right choice: for the small
+dictionaries and short masks used in this project's own demo (Section~4), CPU is not just
+adequate, it is faster than our unoptimized GPU kernel. \textbf{The practical lesson for
+defense is unchanged by which hardware attacks the passphrase}: a long, non-dictionary
+passphrase pushes the keyspace so high that neither CPU nor GPU matters (Table~\ref{tab:est}),
+while a short or common one falls to both, just at different speeds.
 
 %======================================================================
 \section{Defense}
