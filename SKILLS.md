@@ -28,11 +28,12 @@ This file is the agent briefing for the whole repository. Read it first. Keep it
 - [x] Defense module built (`defend/`: analyze + policy + estimate).
 - [x] Scope reconfirmed directly by supervisor: pcaps from the internet are sufficient input;
       no live RF demo or own-lab capture required (see **Locked plan**).
-- [x] Demo report drafted (`report/demo-report.tex`) with measured CPU numbers + a GPU
-      acceleration appendix (estimate vs. measured experiment, CPU/GPU crossover, real
-      full-wordlist result) — see **Demonstration report** below.
-- [ ] `demo-report.pdf` recompiled with the GPU section and reviewed (needs a `pdflatex` pass;
-      not run yet on this machine — see **Demonstration report** rebuild steps).
+- [x] Earlier committed report found to be hallucinated; **discarded fully and rewritten from
+      scratch** as `report/report.tex`, grounded only in real code + real run output (self-test,
+      four real captures, 16/16 tests, ethics guard, CPU/GPU measurements) — see
+      **Demonstration report** below.
+- [ ] `report/report.pdf` compiled and reviewed (needs a `pdflatex` pass; no LaTeX on this
+      machine — compile on Overleaf/TeX host; figures already generated).
 
 **Repo layout today:** assignment PDF, briefing, README, `.gitignore`, `docs/design-proposal.*`,
 and the working `wpacrack/` package + `tests/` + `fixtures/` + `wl/`, `masks/`, `tools/`.
@@ -80,38 +81,36 @@ python3 tools/ethics_guard.py                 # CI guard: no socket/injection an
 
 ## Demonstration report (`report/`)
 
-Built a supervisor-facing demo report with data + visuals generated from the tool itself.
+**The earlier committed report was discarded as hallucinated and rewritten from scratch.** The
+current report is grounded only in real code and real run output; every number is either
+executed live (with the reproducing command in the report's Reproducibility section) or clearly
+labelled "calculated" with its formula.
 
-- `report/make_data.py` — runs the attacks, benchmarks PBKDF2 (hashlib vs naive pure-Python),
-  and emits `data.tex` (measured-number macros), `results_table.tex`, `estimate_table.tex`,
-  and two matplotlib figures (`figures/throughput.pdf`, `figures/timecrack.pdf`).
-- `report/make_gpu_data.py` — **GPU appendix** (fills the "estimate vs measured experiment"
-  gap the design report had). Does NOT re-run anything (no GPU on this machine); it records
-  the real, validated measurements from `notebooks/gpu_pbkdf2_benchmark.ipynb` and
-  `notebooks/gpu_real_capture_crack.ipynb` (both run on Kaggle, 2x Tesla T4, kernel
-  byte-validated against `hashlib.pbkdf2_hmac` before any timing was trusted) plus this
-  repo's own machine's independent full-wordlist CPU cross-check, and emits `gpu_data.tex`,
-  `gpu_comparison_table.tex`, `gpu_fullscale_table.tex`, `figures/gpu_throughput.pdf`,
-  `figures/gpu_crossover.pdf`. To update with a fresh Kaggle run, edit the hardcoded
-  `RATE_*`/`T_*` constants at the top of the script (each has its source in a comment), then
-  re-run it.
-- `report/demo-report.tex` → `report/demo-report.pdf` (7 pages): architecture diagram,
-  4-way-handshake sequence diagram (both TikZ), live-demo script, results table, performance
-  chart, **GPU acceleration section (throughput chart, estimate-vs-CPU-vs-GPU comparison
-  table, CPU/GPU crossover chart, full-realistic-wordlist result)**, defense analyzer +
-  crack-time chart/table, correctness/ethics section.
+- `report/report.tex` — the demonstration/final report, self-contained (verified numbers written
+  inline, real console transcripts shown verbatim). Sections: what we built, architecture (TikZ
+  pipeline), protocol + where we attack (TikZ handshake + the exact crypto), demo (self-test on
+  synthetic fixtures + four real Internet captures), was-it-successful, observed-output (honest
+  offline framing — no live victim), performance (CPU-vs-GPU measured, crossover, full-scale),
+  defense (analyzer/policy/estimate real output + WPA3-SAE/Dragonblood), correctness/ethics,
+  reproducibility.
+- `report/make_figures.py` — regenerates the three figures (`figures/throughput.pdf`,
+  `crossover.pdf`, `timecrack.pdf`) from the real measured constants (each annotated with its
+  source: Kaggle 2x Tesla T4 notebooks + this repo's local cross-check). matplotlib is a
+  dev-only dependency; the tool itself stays stdlib-only.
 
-**Rebuild:**
+**Real numbers embedded (all verified this session):** self-test MIC/PMKID/MASK FOUND +
+negative EXHAUSTED; four real captures cracked (Induction/Coherer, biscotte/test,
+12345678/Harkonen, SP-91862D361/WLAN-771698); 16/16 pytest; ethics guard passes; canonical
+PMK KAT `f42c6f…a12e`; CPU 240/s (1c) → GPU 2,927/s (dual T4); crossover ~7,564; full 5.19M
+list GPU 23 min executed vs CPU 5.5 h calculated.
+
+**Rebuild (needs `pdflatex`, not available on this machine — compile on Overleaf or a TeX host):**
 ```
-. .venv/bin/activate && pip install matplotlib   # one-time (dev venv)
-python report/make_data.py                        # regenerate CPU-only data + figures
-python report/make_gpu_data.py                    # regenerate GPU-appendix data + figures
-cd report && pdflatex demo-report.tex && pdflatex demo-report.tex
+python3 report/make_figures.py                    # regenerate the 3 figures
+cd report && pdflatex report.tex && pdflatex report.tex
 ```
-matplotlib is a **dev-only** dependency for the report charts; the tool itself stays stdlib-only.
-Measured rate is machine-dependent (~150-260 cand/s here) and flows into both the perf chart
-and the defense estimator. GPU numbers are Kaggle-only (no local GPU) — see `notebooks/` to
-reproduce or update them.
+GPU numbers are Kaggle-only (no local GPU) — see `notebooks/` to reproduce or update them; if
+they change, edit the annotated constants at the top of `report/make_figures.py`.
 
 
 
